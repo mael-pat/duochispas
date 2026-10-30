@@ -4821,21 +4821,6 @@ window.TALLER = (function () {
       '¡Bien! La sección final es la mínima comercial que cumple los cuatro criterios a la vez (y nunca menos que el mínimo). En las 16 lámparas de sodio, mandó la caída de tensión: 2,5 mm².');
   };
 
-  I.eu = function (el) {
-    widget(el, { I: 25, L: 10, p: 1 }, [
-      { k: 'I', r: [5, 63, 1], et: function (v) { return 'Intensidad: <b>' + v + ' A<\/b>'; } },
-      { k: 'L', r: [5, 60, 1], et: function (v) { return 'Longitud: <b>' + v + ' m<\/b>'; } },
-      { k: 'p', et: 'Caída máxima permitida', ops: [[1, '1 % (2,3 V)'], [3, '3 % (6,9 V)'], [5, '5 % (11,5 V)']] }
-    ], function (s) {
-      var e = 230 * s.p / 100, eu = e / (s.L / 1000 * s.I), sec = eu > 9.553 ? '4 mm² (9,553) o menos: mira la tabla' : eu > 6.383 ? '6 mm² (6,383) ✔' : 'más de 6 mm²: mira la tabla';
-      return {
-        svg: svg(100, t(180, 34, 'eu = ' + n(eu, 2) + ' V/(A·km)', { a: 'middle', b: 1, f: 20, c: AZ }) + '<rect x="40" y="56" width="280" height="12" rx="6" fill="currentColor" fill-opacity=".1"/>' +
-          '<circle cx="' + Math.max(40, Math.min(320, 40 + eu / 15 * 280)).toFixed(1) + '" cy="62" r="9" fill="' + AZ + '"/>' + '<path d="M' + (40 + 9.553 / 15 * 280).toFixed(1) + ' 50 v24 M' + (40 + 6.383 / 15 * 280).toFixed(1) + ' 50 v24" stroke="' + RO + '" stroke-width="2"/>' +
-          t(40 + 6.383 / 15 * 280, 92, '6 mm²', { a: 'middle', f: 11 }) + t(40 + 9.553 / 15 * 280, 92, '4 mm²', { a: 'middle', f: 11 })),
-        txt: '<p class="int-res">eu = e / (L × I) = ' + n(e, 1) + ' / (' + n(s.L / 1000, 3) + ' × ' + s.I + ') = <b>' + n(eu, 2) + ' V/(A·km)<\/b>. Primera sección con eu menor: <b>' + sec + '<\/b>.<\/p><p>Tabla de 450/750 V, cos φ 1 y 70 °C. Después se comprueba que esa sección aguanta la intensidad. Vivienda básica, 25 A, 10 m y 1 %: 9,2 → 6 mm².<\/p>'
-      };
-    });
-  };
   I.sistemas = function (el) {
     var COND = { des: ['Conductor desnudo', 'Solo sobre <b>aisladores<\/b>.'], ais: ['Conductor aislado sin cubierta', 'En <b>tubos<\/b>, conductos y sobre aisladores; en canal solo si es IP4X y la tapa se abre con herramienta.'], cub: ['Cable con cubierta', 'Casi en todo: fijación directa, tubos, canales, bandejas, con fiador…; el multipolar, también sin fijación.'] };
     widget(el, { c: 'ais', d: 2 }, [
@@ -4851,21 +4836,6 @@ window.TALLER = (function () {
     });
   };
 
-  I.tubos = function (el) {
-    widget(el, { lug: 'emp', L: 20, cv: 2 }, [
-      { k: 'lug', et: 'Dónde va el tubo (3 conductores de 2,5 mm²)', ops: [['emp', 'Empotrado en un tabique'], ['gar', 'En superficie en un garaje']] },
-      { k: 'L', r: [1, 60, 1], et: function (v) { return 'Tramo recto: <b>' + v + ' m<\/b>'; } },
-      { k: 'cv', et: 'Curvas entre dos registros', ops: [[1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5']] }
-    ], function (s) {
-      var reg = Math.max(0, Math.ceil(s.L / 15) - 1), okc = s.cv <= 3, d = '<path d="M20 50 H340" stroke="' + (s.lug === 'emp' ? '#9aa4ad' : AZ) + '" stroke-width="' + (s.lug === 'emp' ? 12 : 10) + '"/>';
-      for (var k = 1; k <= reg; k++) d += '<rect x="' + (20 + 320 * k * 15 / s.L - 8).toFixed(1) + '" y="38" width="16" height="24" fill="' + AM + '"/>';
-      return {
-        svg: svg(90, d + t(180, 84, reg ? reg + ' registro' + (reg > 1 ? 's' : '') + ' intermedio' + (reg > 1 ? 's' : '') : 'sin registros intermedios', { a: 'middle', b: 1 }) + marca(340, 20, okc)),
-        txt: '<p class="int-res">' + (s.lug === 'emp' ? 'Tubo <b>curvable 2221 de 20 mm<\/b>.' : 'Tubo <b>rígido 4321 de 16 mm<\/b>, con abrazaderas cada 0,50 m (4: compresión fuerte; 3: impacto medio, 2 J; 2: desde −5 °C; 1: hasta +60 °C).') +
-          ' Registros cada <b>15 m<\/b> como máximo en recta: aquí ' + reg + '. ' + (okc ? 'Curvas: bien (3 como máximo entre registros).' : '<b>Demasiadas curvas<\/b>: no más de 3 entre dos registros.') + '<\/p><p>Trazado por líneas verticales y horizontales; los cables se meten después de colocar los tubos.<\/p>'
-      };
-    });
-  };
 
   I.canalizacion = function (el) {
     widget(el, { s: 'canal', ip: 1, pin: 0 }, [
@@ -5229,14 +5199,14 @@ window.TALLER = (function () {
       { k: 'L', r: [5, 40, 1], et: function (v) { return 'Longitud: <b>' + v + ' m<\/b>'; } },
       { k: 'S', et: 'Sección (tubo empotrado)', ops: [[50, '50 mm² (159 A)'], [70, '70 mm² (201 A)']] }
     ], function (s) {
-      var I_ = s.P * 1000 / (Math.sqrt(3) * 400 * 0.9), Iz = s.S === 70 ? 201 : 159, tope = 0.91 * Iz, fus = [125, 160, 250].filter(function (f) { return f >= I_ && f <= tope; })[0];
+      var I_ = s.P * 1000 / (Math.sqrt(3) * 400 * 0.9), Iz = s.S === 70 ? 201 : 159, tope = 0.91 * Iz, fus = [63, 100, 160, 250].filter(function (f) { return f >= I_ && f <= tope; })[0];
       var e = s.P * 1000 * s.L / (56 * s.S * 400), oke = e <= 2;
       return {
         svg: svg(110, '<rect x="20" y="40" width="320" height="14" rx="7" fill="currentColor" fill-opacity=".1"/><rect x="' + (20 + I_ / 260 * 320).toFixed(1) + '" y="34" width="' + Math.max(2, (tope - I_) / 260 * 320).toFixed(1) + '" height="26" fill="' + (tope >= I_ ? VE : RO) + '" opacity=".45"/>' +
           t(20 + I_ / 260 * 320, 28, 'Ib ' + n(I_, 1), { a: 'middle', f: 11 }) + t(20 + tope / 260 * 320, 76, '0,91 × Iz = ' + n(tope, 1), { a: 'middle', f: 11 }) +
           t(180, 100, fus ? 'fusible de ' + fus + ' A ✔' : 'ningún fusible sirve ✘', { a: 'middle', b: 1, c: fus ? VE : RO })),
         txt: '<p class="int-res">I = ' + n(s.P * 1000, 0) + ' / (√3 × 400 × 0,9) = <b>' + n(I_, 1) + ' A<\/b>. Con fusible: Ib ≤ In ≤ 0,91 × ' + Iz + ' = ' + n(tope, 1) + ' A → ' + (fus ? '<b>' + fus + ' A<\/b>' : '<b>ninguno<\/b>: sube de sección') +
-          '. Caída: e = P × L / (56 × S × 400) = <b>' + n(e, 2) + ' V<\/b> ' + ok_(oke) + ' (límite 2 V).<\/p><p>La línea general de alimentación (LGA) va de la caja general de protección a la centralización: sección uniforme, sin empalmes, mínimo 10 mm² de cobre.<\/p>'
+          '. Caída: e = P × L / (56 × S × 400) = <b>' + n(e, 2) + ' V<\/b> ' + ok_(oke) + ' (límite 2 V).<\/p><p>El fusible es el de la CGP (caja general de protección): bases de 63, 100, 160 o 250 A. La línea general de alimentación (LGA) va de la CGP a la centralización: sección uniforme, sin empalmes, mínimo 10 mm² de cobre.<\/p>'
       };
     });
   };
@@ -5287,19 +5257,6 @@ window.TALLER = (function () {
     });
   };
 
-  I.ide = function (el) {
-    widget(el, { iga: 40, P: 136 }, [
-      { k: 'iga', et: 'IGA de cada vivienda', ops: [[25, '25 A'], [32, '32 A'], [40, '40 A'], [50, '50 A'], [63, '63 A']] },
-      { k: 'P', r: [40, 200, 1], et: function (v) { return 'Potencia total del edificio: <b>' + v + ' kW<\/b>'; } }
-    ], function (s) {
-      var di = 1.5 * s.iga, una = s.P <= 150;
-      return {
-        svg: svg(100, caja(20, 16, 150, 56, AZ, 'DI para ' + n(di, 1) + ' A') + caja(190, 16, 150, 56, una ? VE : AM, una ? '1 CGP de 250 A' : 'más de 150 kW', { f: 12 })),
-        txt: '<p class="int-res">Cada derivación individual se dimensiona para <b>1,5 veces<\/b> su IGA: 1,5 × ' + s.iga + ' = <b>' + n(di, 1) + ' A<\/b>. ' + (una ? 'Hasta 150 kW: <b>una CGP de 250 A<\/b>.' : 'Por encima de 150 kW la lección no da el caso: consulta las normas de i-DE.') +
-          '<\/p><p>Las normas particulares de i-DE (Iberdrola) concretan, dentro del REBT (Reglamento Electrotécnico para Baja Tensión), cómo se conecta el enlace a su red. El IGA, de 4,5 kA o más. Ejemplo: 20 viviendas elevadas, 9,2 × 14,8 = 136,2 kW.<\/p>'
-      };
-    });
-  };
 
   // ---------- Módulo 4 (resto) ----------
   I.selectivo = function (el) {
@@ -5395,21 +5352,6 @@ window.TALLER = (function () {
     ]);
   };
 
-  var ANI = { pa: ['Con pararrayos, arena arcillosa', 35, '8 picas'], ar: ['Sin pararrayos, arcilla', 25, 'sin picas'], gr: ['Sin pararrayos, grava', 82, 'ni con 20 picas bastaría'] };
-  I.anillo = function (el) {
-    widget(el, { c: 'pa', L: 33 }, [
-      { k: 'c', et: 'Edificio y terreno', ops: Object.keys(ANI).map(function (k) { return [k, ANI[k][0]]; }) },
-      { k: 'L', r: [10, 100, 1], et: function (v) { return 'Longitud del anillo: <b>' + v + ' m<\/b>'; } }
-    ], function (s) {
-      var a = ANI[s.c], ok = s.c !== 'gr' && s.L >= a[1], w = 40 + s.L * 2.2;
-      return {
-        svg: svg(120, '<rect x="' + (180 - w / 2) + '" y="20" width="' + w + '" height="70" fill="none" stroke="#c46a2d" stroke-width="4"/>' + (s.c === 'pa' ? [0, 1, 2, 3, 4, 5, 6, 7].map(function (k) { return '<path d="M' + (180 - w / 2 + (k % 4) * w / 3).toFixed(1) + ' ' + (k < 4 ? 20 : 90) + ' v10" stroke="' + AZ + '" stroke-width="4"/>'; }).join('') : '') +
-          t(180, 112, s.L + ' m de ' + a[1] + ' m ' + ok_(ok), { a: 'middle', b: 1, c: ok ? VE : RO })),
-        txt: '<p class="int-res">La tabla pide <b>' + a[1] + ' m<\/b> (' + a[2] + '). ' + (s.c === 'gr' ? 'En grava habría que alargar el conductor o mejorar el terreno.' : ok ? 'Con ' + s.L + ' m <b>cumple<\/b>.' : 'Faltan <b>' + (a[1] - s.L) + ' m<\/b> de conductor.') +
-          '<\/p><p>Todo edificio nuevo lleva un anillo cerrado de cobre desnudo en el fondo de las zanjas de cimentación. La línea principal de tierra, de cobre, mínimo 16 mm².<\/p>'
-      };
-    });
-  };
 
   var EQUI = [['ban', 'Bañera'], ['af', 'Tubería de agua fría'], ['ac', 'Tubería de agua caliente'], ['des', 'Desagüe metálico'], ['rad', 'Radiador de calefacción']];
   I.equipot = function (el) {
@@ -5741,6 +5683,93 @@ window.TALLER = (function () {
     });
   };
 
+  // Tabla 4 de la guía (anexo 2): cables de 450/750 V a 70 °C, en V/(A·km), para cos φ 1 · 0,9 · 0,8
+  var EU4 = [[1.5, 25.075, 22.665, 20.194], [2.5, 15.356, 13.901, 12.395], [4, 9.553, 8.674, 7.747], [6, 6.383, 5.817, 5.205], [10, 3.792, 3.479, 3.125], [16, 2.383, 2.206, 1.991], [25, 1.507, 1.416, 1.288], [35, 1.086, 1.038, 0.952]];
+  I.eu = function (el) {
+    widget(el, { I: 25, L: 10, p: 1, c: 1 }, [
+      { k: 'I', r: [5, 63, 1], et: function (v) { return 'Intensidad: <b>' + v + ' A<\/b>'; } },
+      { k: 'L', r: [5, 60, 1], et: function (v) { return 'Longitud: <b>' + v + ' m<\/b>'; } },
+      { k: 'p', et: 'Caída máxima permitida (a 230 V)', ops: [[0.5, '0,5 % (1,15 V)'], [1, '1 % (2,3 V)'], [1.5, '1,5 % (3,45 V)'], [3, '3 % (6,9 V)'], [5, '5 % (11,5 V)']] },
+      { k: 'c', et: 'cos φ', ops: [[1, '1'], [0.9, '0,9'], [0.8, '0,8']] }
+    ], function (s) {
+      var e = 230 * s.p / 100, eu = e / (s.L / 1000 * s.I), col = s.c === 1 ? 1 : s.c === 0.9 ? 2 : 3, eleg = EU4.filter(function (f) { return f[col] < eu; })[0];
+      var d = EU4.map(function (f, k) {
+        var es = eleg && f[0] === eleg[0], vale = f[col] < eu;
+        return caja(4 + k * 44.5, 34, 40, 50, es ? VE : vale ? AZ : '#7d8790', '', { op: es ? .9 : vale ? .45 : .25 }) + t(24 + k * 44.5, 56, n(f[0], 1), { a: 'middle', b: 1, f: 13, c: '#fff' }) + t(24 + k * 44.5, 75, n(f[col], 2), { a: 'middle', f: 10, c: '#fff' });
+      }).join('');
+      return {
+        svg: svg(104, t(180, 22, 'eu reglamentaria = ' + n(eu, 3) + ' V/(A·km)', { a: 'middle', b: 1, f: 15, c: AZ }) + d + t(180, 100, 'mm² (arriba) y su eu en la tabla (abajo)', { a: 'middle', f: 10, op: .7 })),
+        txt: '<p class="int-res">eu = e / (L × I) = ' + n(e, 2) + ' / (' + n(s.L / 1000, 3) + ' × ' + s.I + ') = <b>' + n(eu, 3) + ' V/(A·km)<\/b>. Primera sección con eu menor: ' + (eleg ? '<b>' + n(eleg[0], 1) + ' mm²<\/b> (' + n(eleg[col], 3) + ').' : '<b>más de 35 mm²<\/b>: este extracto de la tabla llega hasta 35 mm²; mira la tabla completa de la guía.') +
+          '<\/p><p>Tabla 4 de la guía técnica (anexo 2): cables de 450/750 V a 70 °C. Después se comprueba que esa sección aguanta la intensidad. Vivienda básica, 25 A, 10 m y 1 %: 9,2 → 6 mm².<\/p>'
+      };
+    });
+  };
+
+  var TUBC = [{ 2: 'ligero (320 N)', 3: 'medio (750 N)', 4: 'fuerte (1.250 N)', 5: 'muy fuerte (4.000 N)' }, { 1: 'muy ligero (0,5 J)', 2: 'ligero (1 J)', 3: 'medio (2 J)', 4: 'fuerte (6 J)', 5: 'muy fuerte (20 J)' }, { 2: '−5 °C' }, { 1: '+60 °C', 2: '+90 °C' }];
+  var TUBU = { sup: ['En superficie', '4321', 'rígido (curvable en casos especiales)', 'Ejemplo: en un garaje, rígido de 16 mm para 3 × 2,5 mm², con abrazaderas cada 0,50 m.'], emp: ['Empotrado en obra', '2221', 'rígido, curvable o flexible', 'Ejemplo: en un tabique, curvable de 20 mm para 3 × 2,5 mm².'],
+    hor: ['Embebido en hormigón', '3322', 'curvable o flexible', 'Además, protegido contra el polvo (5) y la lluvia (3).'], aire: ['Al aire', '4321', 'flexible', 'Con resistencia a la corrosión; no recomendado para más de 16 mm².'] };
+  I.tubos = function (el) {
+    widget(el, { lug: 'emp', L: 20, cv: 2 }, [
+      { k: 'lug', et: 'Dónde va el tubo', ops: Object.keys(TUBU).map(function (k) { return [k, TUBU[k][0]]; }) },
+      { k: 'L', r: [1, 60, 1], et: function (v) { return 'Tramo recto: <b>' + v + ' m<\/b>'; } },
+      { k: 'cv', et: 'Curvas entre dos registros', ops: [[1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5']] }
+    ], function (s) {
+      var u = TUBU[s.lug], cod = u[1], reg = Math.max(0, Math.ceil(s.L / 15) - 1), okc = s.cv <= 3, nom = ['Compresión', 'Impacto', 'Temp. mínima', 'Temp. máxima'];
+      var d = cod.split('').map(function (c, k) { return caja(14 + k * 86, 8, 76, 40, [AZ, AM, VE, RO][k], c, { f: 22 }) + t(52 + k * 86, 62, nom[k], { a: 'middle', f: 10, b: 1 }) + t(52 + k * 86, 76, TUBC[k][c].split(' (')[0], { a: 'middle', f: 10 }); }).join('');
+      d += '<path d="M20 104 H340" stroke="#9aa4ad" stroke-width="10"/>';
+      for (var k = 1; k <= reg; k++) d += '<rect x="' + (20 + 320 * k * 15 / s.L - 7).toFixed(1) + '" y="94" width="14" height="20" fill="' + AM + '"/>';
+      return {
+        svg: svg(136, d + t(180, 132, (reg ? reg + ' registro' + (reg > 1 ? 's' : '') + ' intermedio' + (reg > 1 ? 's' : '') : 'sin registros intermedios') + ' · curvas ' + ok_(okc), { a: 'middle', b: 1, f: 12, c: okc ? VE : RO })),
+        txt: '<p class="int-res">' + u[0] + ': tubo <b>' + cod + '<\/b>, ' + u[2] + '. Compresión ' + TUBC[0][cod[0]] + '; impacto ' + TUBC[1][cod[1]] + '; temperatura de ' + TUBC[2][cod[2]] + ' a ' + TUBC[3][cod[3]] + '. ' + u[3] +
+          '<\/p><p>Registros cada <b>15 m<\/b> como máximo en recta (aquí ' + reg + ') y ' + (okc ? 'no más de 3 curvas entre dos registros: bien.' : '<b>demasiadas curvas<\/b>: no más de 3 entre dos registros.') + ' Todos, no propagadores de la llama (ITC-BT 21).<\/p>'
+      };
+    });
+  };
+
+  // Tabla A de la guía de la ITC-BT 26: longitud mínima del anillo (m) según picas de 2 m; [sin pararrayos, con pararrayos]; null = no basta
+  var PICAS = [0, 1, 2, 4, 6, 8, 10, 15, 20, 30, 50];
+  var ANI = {
+    arc: ['Orgánicos, arcillas, margas', [25, null, null, null, null, null, null, null, null, null, null], [34, 30, 26, null, null, null, null, null, null, null, null]],
+    are: ['Arenas arcillosas, graveras, rocas sedimentarias', [28, 25, null, null, null, null, null, null, null, null, null], [67, 63, 59, 51, 43, 35, null, null, null, null, null]],
+    cal: ['Calizas agrietadas, rocas eruptivas', [54, 50, 46, 38, 30, null, null, null, null, null, null], [134, 130, 126, 118, 110, 105, 94, 74, null, null, null]],
+    gra: ['Grava y arena silícea', [162, 158, 154, 146, 138, 130, 122, 102, 82, null, null], [400, 396, 392, 384, 376, 368, 360, 340, 320, 280, 200]]
+  };
+  I.anillo = function (el) {
+    widget(el, { te: 'are', pr: 1, L: 33 }, [
+      { k: 'te', et: 'Terreno', ops: Object.keys(ANI).map(function (k) { return [k, ANI[k][0]]; }) },
+      { k: 'pr', et: 'Pararrayos', ops: [[0, 'Sin pararrayos'], [1, 'Con pararrayos']] },
+      { k: 'L', r: [10, 420, 1], et: function (v) { return 'Longitud del anillo: <b>' + v + ' m<\/b>'; } }
+    ], function (s) {
+      var fila = ANI[s.te][s.pr ? 2 : 1], k = -1;
+      for (var i = 0; i < PICAS.length; i++) if (fila[i] !== null && s.L >= fila[i]) { k = i; break; }
+      var w = Math.min(300, 40 + s.L * 0.7), np = k >= 0 ? PICAS[k] : 0, d = '<rect x="' + (180 - w / 2).toFixed(1) + '" y="18" width="' + w.toFixed(1) + '" height="64" fill="none" stroke="#c46a2d" stroke-width="4"/>';
+      for (i = 0; i < np; i++) { var lado = i % 2, pos = Math.floor(i / 2), m = Math.ceil(np / 2); d += '<path d="M' + (180 - w / 2 + (pos + .5) * w / m).toFixed(1) + ' ' + (lado ? 82 : 18) + ' v' + (lado ? 12 : -12) + '" stroke="' + AZ + '" stroke-width="4"/>'; }
+      var minimo = fila.filter(function (v) { return v !== null; }).slice(-1)[0];
+      return {
+        svg: svg(124, d + t(180, 116, k < 0 ? 'no basta: alarga el anillo' : (np ? np + ' picas de 2 m' : 'sin picas') + ' ✔', { a: 'middle', b: 1, c: k < 0 ? RO : VE })),
+        txt: '<p class="int-res">' + (k < 0 ? 'Con ' + s.L + ' m de anillo, ni con picas se llega: hace falta al menos <b>' + minimo + ' m<\/b> (con ' + PICAS[fila.lastIndexOf(minimo)] + ' picas) o mejorar el terreno.' : 'Con ' + s.L + ' m de anillo basta' + (np ? 'n <b>' + np + ' picas<\/b> de 2 m' : ' <b>sin picas<\/b>') + ' (la tabla pide ' + fila[k] + ' m).') +
+          '<\/p><p>Tabla A de la guía técnica de la ITC-BT 26 (orientativa): busca menos de 15 Ω con pararrayos y menos de 37 Ω sin él. Las picas, repartidas por el anillo y separadas al menos dos veces su longitud. Manda la tensión de contacto.<\/p>'
+      };
+    });
+  };
+
+  // Potencia por CGP en las normas de i-DE (MT 2.80.12): calibre → kW
+  var CGPK = [[100, 62], [160, 99], [250, 155]];
+  I.ide = function (el) {
+    widget(el, { iga: 40, P: 136 }, [
+      { k: 'iga', et: 'IGA de cada vivienda', ops: [[25, '25 A'], [32, '32 A'], [40, '40 A'], [50, '50 A'], [63, '63 A']] },
+      { k: 'P', r: [20, 300, 1], et: function (v) { return 'Potencia total del edificio: <b>' + v + ' kW<\/b>'; } }
+    ], function (s) {
+      var di = 1.5 * s.iga, dos = s.P > 150, cada = dos ? s.P / 2 : s.P, cg = CGPK.filter(function (c) { return c[1] >= cada; })[0];
+      var txtC = cg ? (dos ? '<b>2 CGP de ' + cg[0] + ' A<\/b> (unos ' + n(cada, 1) + ' kW cada una; ' + cg[0] + ' A llega a ' + cg[1] + ' kW) y 2 interruptores generales de maniobra, como recomienda i-DE por encima de 150 kW.' : '<b>1 CGP de ' + cg[0] + ' A<\/b> (llega a ' + cg[1] + ' kW).') :
+        'Ni repartida en dos CGP de 250 A (155 kW cada una) basta: habría que repartirla en más.';
+      return {
+        svg: svg(100, caja(20, 16, 150, 56, AZ, 'DI para ' + n(di, 1) + ' A') + caja(190, 16, 150, 56, cg ? VE : RO, cg ? (dos ? '2 × ' : '1 × ') + 'CGP ' + cg[0] + ' A' : 'más de 2 CGP', { f: 14 })),
+        txt: '<p class="int-res">Cada derivación individual se calcula para <b>1,5 veces<\/b> su IGA: 1,5 × ' + s.iga + ' = <b>' + n(di, 1) + ' A<\/b>. ' + txtC +
+          '<\/p><p>Potencia por CGP en las normas de i-DE: 100 A → 62 kW, 160 A → 99 kW, 250 A → 155 kW (la de 400 A, solo para un cliente único con medida por transformadores). Ejemplo: 20 viviendas elevadas, 136,2 kW → 1 CGP de 250 A.<\/p>'
+      };
+    });
+  };
   // Esquemas del taller dentro de una lección
   function montar(fig) {
     if (fig.getAttribute('data-hecho')) return;
