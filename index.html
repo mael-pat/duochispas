@@ -551,6 +551,12 @@ html, body { margin: 0; padding: 0; background: var(--fondo); color: var(--texto
 .ilustra.interactiva .esq-svg { min-width: 520px; }
 .int-c .chip:disabled { opacity: .35; }
 
+/* Copia por Drive y plan de estudio */
+.pasos-copia { margin: 6px 0 8px; padding-left: 22px; }
+.pasos-copia li { margin: 4px 0; }
+details.tarjeta summary { cursor: pointer; font-weight: 600; }
+details.tarjeta[open] summary { margin-bottom: 8px; }
+
 </style>
 <div id="app"></div>
 <div id="modal" class="modal oculto">
@@ -6089,7 +6095,7 @@ window.TALLER = (function () {
     var html = barra('Inicio', 'Ajustes', inicio) + '<div class="contenido">' +
       '<div class="tarjeta"><h4 style="margin:0 0 8px">Tu nombre<\/h4><div class="fila" style="align-items:center"><input id="aj-nombre" class="buscar" style="margin:0" maxlength="30" placeholder="Tu nombre" value="' + esc(datos.nombre || '') + '">' +
       '<button class="btn sec" id="aj-guardar" style="width:auto;margin:0;text-align:center">Guardar<\/button><\/div><p class="aviso">Aparece en la bienvenida del inicio. Déjalo vacío si no quieres que salga.<\/p><\/div>' +
-      '<button class="btn sec" id="aj-copia"><span>💾 Copia de seguridad del progreso<small>' + (diasDesdeCopia() === null ? 'Aún no has hecho ninguna' : 'Última: hace ' + diasDesdeCopia() + ' días') + '<\/small><\/span><span class="n">›<\/span><\/button>' +
+      '<button class="btn sec" id="aj-copia"><span>☁️ Pasar y guardar el progreso (Drive)<small>' + (diasDesdeCopia() === null ? 'Aún no has hecho ninguna' : 'Última: hace ' + diasDesdeCopia() + ' días') + '<\/small><\/span><span class="n">›<\/span><\/button>' +
       ajustesIA() +
       '<div class="tarjeta"><h4 style="margin:0 0 8px">Meta diaria<\/h4><div class="selector" id="metas">' +
       METAS.map(function (m) {
@@ -6166,6 +6172,196 @@ window.TALLER = (function () {
     return lista.length ? Math.round(n / lista.length * 100) : 0;
   }
 
+  // ---------- Mis fallos ----------
+  // Cada pregunta fallada se apunta: veces (n), último fallo (u) y aciertos seguidos desde entonces (b).
+  // Sale de la lista al acertarla 2 veces seguidas. Se agrupan por tema: la ITC en el banco, la lección en los mini-tests.
+  var SUPERADA = 2;
+  datos.fallos = datos.fallos || {};
+  if (!datos.fallosIni) {
+    Object.keys(datos.srs).forEach(function (id) { if (!datos.fallos[id]) datos.fallos[id] = { n: 1, u: datos.srs[id].p, b: 0 }; });
+    datos.fallosIni = 1;
+  }
+  function anotarFallo(p, ok) {
+    if (p.sim || !p.id) return;
+    var f = datos.fallos[p.id];
+    if (!ok) { f = datos.fallos[p.id] = f || { n: 0, b: 0 }; f.n++; f.b = 0; f.u = hoy(); }
+    else if (f) f.b++;
+  }
+  function fallosActivos() {
+    return Object.keys(datos.fallos).filter(function (id) { return datos.fallos[id].b < SUPERADA; }).map(porId).filter(Boolean);
+  }
+  function lanzarFallos(titulo, ps, atras, textoAtras) {
+    empezar(titulo, barajar(ps), 0, false, null, { volver: atras, textoVolver: textoAtras, rehacer: misFallos, textoRehacer: 'Ver mis fallos' });
+  }
+  function peoresFallos(n) {
+    return fallosActivos().sort(function (x, y) { return datos.fallos[y.id].n - datos.fallos[x.id].n; }).slice(0, n);
+  }
+  function misFallos() {
+    pantalla = 'fallos';
+    var modDe = {};
+    MODULOS.forEach(function (m) { m.lecciones.forEach(function (l) { modDe[l.titulo] = m.titulo; }); });
+    var act = fallosActivos(), sup = Object.keys(datos.fallos).filter(function (id) { return datos.fallos[id].b >= SUPERADA; }).length, grupos = {}, orden = [];
+    act.forEach(function (p) {
+      var g = grupos[p.t];
+      if (!g) { g = grupos[p.t] = { t: p.t, ps: [], n: 0 }; orden.push(g); }
+      g.ps.push(p); g.n += datos.fallos[p.id].n;
+    });
+    orden.sort(function (x, y) { return y.ps.length - x.ps.length || y.n - x.n; });
+    var html = barra('Evaluaciones', 'Mis fallos', evaluaciones) + '<div class="contenido">' +
+      '<div class="tarjeta"><div class="cifras"><div class="cifra"><b style="color:var(--ko)">' + act.length + '<\/b><span>por superar<\/span><\/div>' +
+      '<div class="cifra"><b style="color:var(--ok)">' + sup + '<\/b><span>superadas<\/span><\/div><div class="cifra"><b>' + orden.length + '<\/b><span>temas<\/span><\/div><\/div>' +
+      '<p class="aviso" style="margin-bottom:0">Una pregunta sale de aquí cuando la aciertas ' + SUPERADA + ' veces seguidas. Empieza por los temas de arriba: son los que más fallas.<\/p><\/div>' +
+      (act.length ? '<button class="btn" id="f-todo">🎯 Repasar mis fallos<small>Las ' + Math.min(20, act.length) + ' que más fallas, mezcladas<\/small><\/button>' :
+        '<div class="vacio">No tienes fallos pendientes. ¡Bien hecho!<\/div>') +
+      '<div class="tema-lista">' + orden.map(function (g, i) {
+        var st = datos.temas[g.t], pct = st && st.total ? ' · aciertas el ' + Math.round(st.ok / st.total * 100) + ' %' : '';
+        return '<button class="btn sec" data-g="' + i + '"><span>' + esc(g.t) + '<small>' + (modDe[g.t] ? esc(modDe[g.t]) + ' · ' : '') + g.ps.length + ' pregunta' + (g.ps.length === 1 ? '' : 's') +
+          ' · ' + g.n + ' fallo' + (g.n === 1 ? '' : 's') + pct + '<\/small><\/span><span class="n">Repasar ›<\/span><\/button>';
+      }).join('') + '<\/div><\/div>';
+    app.innerHTML = html;
+    activarVolver();
+    var todo = document.getElementById('f-todo');
+    if (todo) todo.onclick = function () { lanzarFallos('Mis fallos', peoresFallos(20), misFallos, 'Mis fallos'); };
+    Array.prototype.forEach.call(document.querySelectorAll('[data-g]'), function (b) {
+      b.onclick = function () { var g = orden[Number(b.getAttribute('data-g'))]; lanzarFallos('Mis fallos · ' + g.t, g.ps, misFallos, 'Mis fallos'); };
+    });
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- Plan de estudio hasta el examen ----------
+  // Con la fecha del examen y los días de descanso reparte las lecciones que faltan entre los días de estudio
+  // y deja al final unos días solo para repasar y hacer exámenes. Cada día dice qué toca y marca lo hecho.
+  datos.lecDia = datos.lecDia || {};
+  function contarLeccionHoy() {
+    var d = hoy();
+    datos.lecDia[d] = (datos.lecDia[d] || 0) + 1;
+    Object.keys(datos.lecDia).sort().slice(0, -60).forEach(function (k) { delete datos.lecDia[k]; });
+  }
+  var DESCANSOS = [['0', 'Estudio todos los días', []], ['1', 'Descanso los domingos', [0]], ['2', 'Descanso sábado y domingo', [6, 0]]];
+  function aFecha(t) { var p = t.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+  function diasEntre(a, b) { return Math.round((aFecha(b) - aFecha(a)) / 86400000); }
+  function fechaCorta(t) { return aFecha(t).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); }
+  function esLibre(t, pl) { return DESCANSOS[Number(pl.libres) || 0][2].indexOf(aFecha(t).getDay()) >= 0; }
+  // Días de estudio desde «desde» (incluido) hasta «hasta» (sin incluir)
+  function diasEstudio(desde, hasta, pl) {
+    var n = 0;
+    for (var d = desde, i = 0; d < hasta && i < 3650; d = diaAnterior(d, -1), i++) if (!esLibre(d, pl)) n++;
+    return n;
+  }
+  function lecPendientes() {
+    var r = [];
+    MODULOS.forEach(function (m, i) { m.lecciones.forEach(function (l, k) { if (!datos.leidas[l.id]) r.push({ i: i, k: k }); }); });
+    return r;
+  }
+  function hechoHoy(modo) {
+    return datos.historial.some(function (x) { return fechaTxt(new Date(x.f)) === hoy() && x.modo.indexOf(modo) === 0; });
+  }
+  function calcPlan() {
+    var pl = datos.plan;
+    if (!pl || !pl.fecha) return null;
+    var h = hoy(), r = { pl: pl, quedan: diasEntre(h, pl.fecha), pend: lecPendientes(), hoyLeidas: datos.lecDia[h] || 0, tareas: [] };
+    var total = 0;
+    MODULOS.forEach(function (m) { total += m.lecciones.length; });
+    r.total = total;
+    if (r.quedan <= 0) return r;
+    r.estudio = diasEstudio(h, pl.fecha, pl);
+    r.reserva = r.estudio >= 21 ? 7 : r.estudio >= 4 ? Math.max(1, Math.floor(r.estudio * 0.25)) : 0;
+    r.aprend = Math.max(1, r.estudio - r.reserva);
+    r.libreHoy = esLibre(h, pl);
+    var base = r.pend.length + r.hoyLeidas;
+    r.ritmo = base ? Math.ceil(base / r.aprend) : 0;
+    r.objetivo = r.libreHoy ? 0 : r.ritmo;
+    r.fase = r.pend.length ? 'aprender' : 'repasar';
+    if (r.objetivo) r.tareas.push({ id: 'lec', txt: 'Lecciones nuevas: ' + Math.min(r.hoyLeidas, r.objetivo) + ' de ' + r.objetivo, hecha: r.hoyLeidas >= r.objetivo });
+    var rep = pendientesHoy().length;
+    if (!r.libreHoy || rep) r.tareas.push({ id: 'rep', txt: rep ? 'Repaso de hoy: ' + rep + ' pregunta' + (rep === 1 ? '' : 's') : 'Repaso de hoy: nada pendiente', hecha: rep === 0 });
+    var fa = fallosActivos().length;
+    if (!r.libreHoy && (fa >= 5 || (r.fase === 'repasar' && fa))) r.tareas.push({ id: 'fal', txt: 'Repasar tus fallos (' + fa + ' por superar)', hecha: hechoHoy('Mis fallos') });
+    var ex = datos.historial.filter(function (x) { return x.modo === 'Examen real'; })[0], diasEx = ex ? diasEntre(fechaTxt(new Date(ex.f)), h) : 99;
+    var leidasPct = total ? (total - r.pend.length) / total : 0;
+    if (!r.libreHoy && (r.fase === 'repasar' || r.quedan <= r.reserva + 1 || (leidasPct >= 0.2 && diasEx >= 7) || diasEx === 0))
+      r.tareas.push({ id: 'exa', txt: 'Examen real (' + SIMULACRO_N + ' preguntas, ' + SIMULACRO_MIN + ' min)', hecha: diasEx === 0 });
+    r.hechas = r.tareas.filter(function (t) { return t.hecha; }).length;
+    return r;
+  }
+  function tarjetaPlan() {
+    var r = calcPlan();
+    if (!r) return '<button class="portada" id="b-plan"><span class="ico">📅<\/span><span><b>Plan hasta el examen<\/b><small>Pon la fecha de tu examen y te digo qué estudiar cada día<\/small><\/span><\/button>';
+    var sub = r.quedan <= 0 ? 'Tu examen era el ' + fechaCorta(r.pl.fecha) + '. Pon una fecha nueva o borra el plan' :
+      r.libreHoy && !r.tareas.length ? 'Hoy descansas · faltan ' + r.quedan + ' días' :
+        'Hoy: ' + r.hechas + ' de ' + r.tareas.length + ' tareas hechas · faltan ' + r.quedan + ' día' + (r.quedan === 1 ? '' : 's');
+    return '<button class="portada" id="b-plan"><span class="ico">' + (r.tareas.length && r.hechas === r.tareas.length ? '✅' : '📅') + '<\/span><span><b>Plan de hoy<\/b><small>' + sub + '<\/small><\/span><\/button>';
+  }
+  function siguienteLeccion() {
+    var p = lecPendientes()[0];
+    if (p) abrirLeccion(p.i, p.k);
+  }
+  function formPlan(pl) {
+    var min = diaAnterior(hoy(), -1);
+    return '<div class="tarjeta"><h4 style="margin:0 0 8px">' + (pl ? 'Cambiar el plan' : 'Crear mi plan') + '<\/h4>' +
+      '<label class="aviso" for="pl-fecha">Fecha del examen<\/label><input id="pl-fecha" class="buscar" type="date" min="' + min + '" value="' + (pl ? pl.fecha : '') + '">' +
+      '<div class="aviso">Descansos<\/div><div class="selector" id="pl-libres">' + DESCANSOS.map(function (x) {
+        return '<button data-l="' + x[0] + '" class="' + (String(pl ? pl.libres || 0 : 0) === x[0] ? 'activo' : '') + '">' + x[1] + '<\/button>';
+      }).join('') + '<\/div>' +
+      '<button class="btn" id="pl-guardar" style="text-align:center">' + (pl ? 'Guardar los cambios' : 'Crear mi plan') + '<\/button><\/div>';
+  }
+  function planEstudio() {
+    pantalla = 'plan';
+    var r = calcPlan(), html = barra('Inicio', 'Plan de estudio', inicio) + '<div class="contenido">';
+    if (!r) {
+      html += '<div class="tarjeta"><p style="margin-top:0">Dime cuándo es tu examen y qué días descansas. Repartiré las lecciones que te faltan entre tus días de estudio y dejaré la última semana para repasar y hacer exámenes. Cada día verás qué toca.<\/p><\/div>' + formPlan(null);
+    } else if (r.quedan <= 0) {
+      html += '<div class="tarjeta"><h2 style="margin-top:0">🎓 ¿Qué tal el examen?<\/h2><p>Tu examen era el ' + esc(fechaCorta(r.pl.fecha)) + '. Si tienes otra convocatoria, pon la fecha nueva.<\/p><\/div>' + formPlan(r.pl);
+    } else {
+      var leidas = r.total - r.pend.length, pct = r.total ? Math.round(leidas / r.total * 100) : 0;
+      html += '<div class="tarjeta"><div class="cifras"><div class="cifra"><b>' + r.quedan + '<\/b><span>día' + (r.quedan === 1 ? '' : 's') + ' para el examen<\/span><\/div>' +
+        '<div class="cifra"><b>' + r.pend.length + '<\/b><span>lecciones por leer<\/span><\/div><div class="cifra"><b>' + r.estudio + '<\/b><span>días de estudio<\/span><\/div><\/div>' +
+        '<p class="aviso" style="margin-bottom:0">Examen: ' + esc(fechaCorta(r.pl.fecha)) + ' · llevas el ' + pct + ' % de las lecciones' + '<\/p><\/div>' +
+        '<h4 class="grupo">' + (r.libreHoy && !r.tareas.length ? 'Hoy descansas 😌' : 'Hoy toca') + '<\/h4>';
+      if (r.libreHoy && !r.tareas.length) html += '<div class="vacio">Hoy es tu día de descanso. Si te apetece, puedes adelantar trabajo desde Aprendizaje o Evaluaciones.<\/div>';
+      r.tareas.forEach(function (t) {
+        html += '<button class="btn' + (t.hecha ? ' sec' : '') + '" data-t="' + t.id + '"><span>' + (t.hecha ? '✅ ' : '⬜ ') + esc(t.txt) + '<\/span><span class="n">' + (t.hecha ? '' : 'Ir ›') + '<\/span><\/button>';
+      });
+      html += '<div class="tarjeta"><h4 style="margin:0 0 8px">Tu ritmo<\/h4><p style="margin:0">' +
+        (r.fase === 'aprender' ? 'Para llegar, <b>' + r.ritmo + (r.ritmo === 1 ? ' lección nueva' : ' lecciones nuevas') + ' por día de estudio<\/b>, con los controles que vayan saliendo. ' +
+          (r.reserva ? 'Los últimos ' + r.reserva + ' días de estudio quedan para repasar y hacer exámenes.' : 'Ya no quedan días de repaso: aprovecha cada día.') :
+          '¡Has leído todas las lecciones! Hasta el examen: repaso de hoy, tus fallos y un examen real cada día.') + '<\/p>' +
+        (r.ritmo > 8 ? '<p class="aviso" style="color:var(--ko)">⚠️ El plan va muy apretado. Si puedes, retrasa la fecha o quita días de descanso.<\/p>' : '') +
+        '<p class="aviso" style="margin-bottom:0">Cada día el plan se recalcula con lo que llevas: si un día haces menos, se reparte entre los siguientes.<\/p><\/div>' +
+        '<details class="tarjeta"><summary>Cambiar la fecha o los descansos<\/summary>' + formPlan(r.pl) + '<\/details>' +
+        '<button class="btn sec" id="pl-borrar" style="text-align:center">Borrar el plan<\/button>';
+    }
+    html += '<\/div>';
+    app.innerHTML = html;
+    activarVolver();
+    var libres = r && r.pl ? String(r.pl.libres || 0) : '0';
+    Array.prototype.forEach.call(document.querySelectorAll('#pl-libres button'), function (b) {
+      b.onclick = function () {
+        libres = b.getAttribute('data-l');
+        Array.prototype.forEach.call(document.querySelectorAll('#pl-libres button'), function (o) { o.classList.toggle('activo', o === b); });
+      };
+    });
+    var g = document.getElementById('pl-guardar');
+    if (g) g.onclick = function () {
+      var f = document.getElementById('pl-fecha').value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(f) || f <= hoy()) { aviso('Elige una fecha a partir de mañana'); return; }
+      datos.plan = { fecha: f, libres: Number(libres), mod: Date.now() };
+      guardar(); aviso('📅 Plan guardado'); planEstudio();
+    };
+    var bo = document.getElementById('pl-borrar');
+    if (bo) bo.onclick = function () { confirmar('¿Borrar tu plan de estudio?', 'Borrar', function () { delete datos.plan; guardar(); planEstudio(); }); };
+    Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (b) {
+      b.onclick = function () {
+        var t = b.getAttribute('data-t');
+        if (t === 'lec') siguienteLeccion();
+        else if (t === 'rep') { var ps = pendientesHoy(); if (ps.length) empezar('Repaso de hoy', barajar(ps), 0, true, null, { volver: planEstudio, textoVolver: 'Plan' }); }
+        else if (t === 'fal') lanzarFallos('Mis fallos', peoresFallos(20), planEstudio, 'Plan');
+        else if (t === 'exa') confirmar('Examen real: ' + SIMULACRO_N + ' preguntas en ' + SIMULACRO_MIN + ' minutos. No verás si aciertas hasta entregarlo. ¿Empezamos?', 'Empezar', empezarExamen);
+      };
+    });
+    window.scrollTo(0, 0);
+  }
+
   // ---------- Inicio ----------
   // Primera vez: la app pregunta el nombre para la bienvenida (se cambia en Ajustes)
   function pedirNombre() {
@@ -6190,7 +6386,7 @@ window.TALLER = (function () {
     var media = hechos ? datos.historial.reduce(function (s, h) { return s + h.aciertos / h.total; }, 0) / hechos * 10 : 0;
     app.innerHTML =
       '<div class="cabecera"><h1 class="logo"><svg viewBox="8 22 92 68" width="62" height="46" aria-hidden="true"><line x1="12" y1="56" x2="20" y2="56" stroke="#f2d39a" stroke-width="5" stroke-linecap="round"/><line x1="88" y1="56" x2="96" y2="56" stroke="#f2d39a" stroke-width="5" stroke-linecap="round"/><circle cx="34" cy="56" r="15" fill="#1b2235" stroke="#f2d39a" stroke-width="5"/><circle cx="74" cy="56" r="15" fill="#1b2235" stroke="#f2d39a" stroke-width="5"/><path d="M27 50 A9 9 0 0 1 35 45" stroke="#5a6683" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M67 50 A9 9 0 0 1 75 45" stroke="#5a6683" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M60 26 L45 60 L54 60 L48 86 L66 50 L57 50 Z" fill="#ffc12e" stroke="#0b1020" stroke-width="2.5" stroke-linejoin="round"/><\/svg><span><span class="duo">Duo<\/span><span class="chispas">Chispas<\/span><\/span><\/h1>' + (datos.nombre ? '<div class="bienvenida">Bienvenido, ' + esc(datos.nombre) + '<\/div>' : '') + '<div class="sub">Aprende y practica el Reglamento Electrotécnico para Baja Tensión<\/div><\/div>' +
-      '<div class="contenido">' + tarjetaRacha() + avisoCopia() + tarjetaNivel() +
+      '<div class="contenido">' + tarjetaRacha() + avisoCopia() + tarjetaNivel() + tarjetaPlan() +
       '<button class="portada" id="b-apr"><span class="ico">📖<\/span><span><b>Aprendizaje<\/b><small>' + todas.length +
       ' lecciones cortas en ' + MODULOS.length + ' módulos · llevas el ' + porcentaje(todas) + ' %<\/small><\/span><\/button>' +
       '<button class="portada" id="b-eva"><span class="ico">📝<\/span><span><b>Evaluaciones<\/b><small>' + BANCO.length +
@@ -6205,6 +6401,7 @@ window.TALLER = (function () {
       '<\/div>';
     document.getElementById('b-racha').onclick = ajustesRacha;
     document.getElementById('b-nivel').onclick = niveles;
+    document.getElementById('b-plan').onclick = planEstudio;
     var bc = document.getElementById('b-aviso-copia'); if (bc) bc.onclick = function () { copiaSeguridad(); };
     informarAndroid();
     document.getElementById('b-apr').onclick = aprendizaje;
@@ -6486,6 +6683,7 @@ window.TALLER = (function () {
       if (k < n - 1) { leccion(id, k + 1, alSalir); return; }
       var nueva = !datos.leidas[id];
       datos.leidas[id] = true;
+      if (nueva) contarLeccionHoy();
       datos.ultimaLeccion = Date.now();
       guardar();
       sumarXP(nueva ? Math.min(40, 5 * n) : 5, nueva ? PN.leccion : 0);
@@ -6597,6 +6795,7 @@ window.TALLER = (function () {
       '<button class="btn" id="b-rep"' + (nf ? '' : ' disabled') + '>🔁 Repaso de hoy<small>' +
       (nf ? nf + ' pregunta' + (nf === 1 ? '' : 's') + ' para repasar' : seg ? 'Nada pendiente hoy · ' + seg + ' en seguimiento' : 'Aún no hay preguntas falladas') +
       ' · ' + datos.dominadas + ' dominadas<\/small><\/button>' +
+      '<button class="btn" id="b-fallos">❌ Mis fallos<small>' + (function () { var n = fallosActivos().length; return n ? n + ' pregunta' + (n === 1 ? '' : 's') + ' por superar, agrupadas por tema' : 'Aquí se juntan las preguntas que fallas, por tema'; })() + '<\/small><\/button>' +
       '<button class="btn" id="b-exa">🎓 Examen real<small>' + SIMULACRO_N + ' preguntas · ' + SIMULACRO_MIN + ' min · corrección al final<\/small><\/button>' +
       '<button class="btn" id="b-sim">📝 Simulacro con corrección<small>' + SIMULACRO_N + ' preguntas · ves la solución en cada una<\/small><\/button>' +
       '<button class="btn" id="b-tema">📚 Practicar por tema<small>Elige una ITC o el articulado<\/small><\/button>' +
@@ -6617,6 +6816,7 @@ window.TALLER = (function () {
       confirmar('Examen real: ' + SIMULACRO_N + ' preguntas en ' + SIMULACRO_MIN + ' minutos. No verás si aciertas hasta entregarlo. ¿Empezamos?', 'Empezar', empezarExamen);
     };
     document.getElementById('b-est').onclick = estadisticas;
+    document.getElementById('b-fallos').onclick = misFallos;
     document.getElementById('b-sup').onclick = listaSupuestos;
     document.getElementById('b-simb').onclick = function () { empezar('Test de simbología', preguntasSimbologia(SIMBOLOGIA_N), 0); };
     window.scrollTo(0, 0);
@@ -6758,6 +6958,7 @@ window.TALLER = (function () {
     var st = datos.temas[p.t] || (datos.temas[p.t] = { ok: 0, total: 0 });
     st.total++; if (ok) st.ok++;
     registrarRepaso(p, ok);
+    anotarFallo(p, ok);
   }
 
   function responder(k) {
@@ -8442,49 +8643,120 @@ window.TALLER = (function () {
     g.onclick = function () { datos.ia.clave = document.getElementById('ia-clave').value.trim(); guardar(); aviso(datos.ia.clave ? 'IA activada' : 'IA desactivada'); };
   }
 
-  // ---------- Copia de seguridad del progreso ----------
-  // Todo el progreso vive en este dispositivo. La copia es el mismo objeto «datos» en JSON: se guarda en un
-  // archivo o se copia como texto, y se restaura en cualquier versión de la app (Android, iPad o claude.ai).
+  // ---------- Copia de seguridad y paso del progreso por Google Drive ----------
+  // Todo el progreso vive en este dispositivo. La copia es el objeto «datos» en JSON, sin la clave de la IA.
+  // Para pasarlo entre el móvil y el iPad se guarda en Drive desde uno y se abre en el otro: al abrirla se JUNTA
+  // con lo que ya hay (no se pierde lo estudiado en ninguno de los dos). También se puede sustituir.
   var EN_CLAUDE = !!(window.claude && window.claude.use);
   // Pide al navegador que no borre los datos por falta de espacio o de uso (si lo permite)
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* no disponible */ }
   function diasDesdeCopia() { return datos.ultimaCopia ? Math.floor((Date.now() - datos.ultimaCopia) / 86400000) : null; }
   function avisoCopia() {
     var d = diasDesdeCopia();
-    if (!R.total || (d !== null && d < 14)) return '';
-    return '<button class="aviso-copia" id="b-aviso-copia">💾 ' + (d === null ? 'Aún no has hecho ninguna copia de seguridad de tu progreso.' : 'Tu última copia de seguridad es de hace ' + d + ' días.') + ' <b>Hacer una copia ›<\/b><\/button>';
+    if (!R.total || (d !== null && d < 7)) return '';
+    return '<button class="aviso-copia" id="b-aviso-copia">☁️ ' + (d === null ? 'Aún no has guardado tu progreso en Drive.' : 'Tu última copia en Drive es de hace ' + d + ' días.') + ' <b>Guardarlo ›<\/b><\/button>';
   }
-  function textoCopia() { return JSON.stringify({ app: 'DuoChispas', version: 1, fecha: new Date().toISOString(), datos: datos }); }
+  function textoCopia() {
+    var d = JSON.parse(JSON.stringify(datos));
+    delete d.ia;   // la clave de la IA no sale del dispositivo
+    return JSON.stringify({ app: 'DuoChispas', version: 2, fecha: new Date().toISOString(), equipo: ANDROID ? 'móvil' : 'iPad', datos: d });
+  }
+  // Mezcla general: números → el mayor; sí/no → sí si alguno lo tiene; textos → el mayor (fechas AAAA-MM-DD);
+  // listas → la más larga; objetos → clave a clave
+  function mezclar(a, b) {
+    if (a === undefined || a === null) return b;
+    if (b === undefined || b === null) return a;
+    if (typeof a === 'number' && typeof b === 'number') return Math.max(a, b);
+    if (typeof a === 'boolean' || typeof b === 'boolean') return !!(a || b);
+    if (typeof a === 'string' && typeof b === 'string') return a >= b ? a : b;
+    if (Array.isArray(a) || Array.isArray(b)) return (Array.isArray(a) ? a : []).length >= (Array.isArray(b) ? b : []).length ? a : b;
+    if (typeof a === 'object' && typeof b === 'object') {
+      var r = {};
+      Object.keys(a).concat(Object.keys(b)).forEach(function (k) { if (!(k in r)) r[k] = mezclar(a[k], b[k]); });
+      return r;
+    }
+    return a;
+  }
+  function sumaXp(r) { return Object.keys((r && r.xp) || {}).reduce(function (s, k) { return s + (r.xp[k] || 0); }, 0); }
+  // Junta el progreso de este dispositivo (a) con el de la copia (b)
+  function fusionar(a, b) {
+    var r = mezclar(a, b);
+    // Historial: los tests de los dos, sin repetir
+    var vistos = {};
+    r.historial = (a.historial || []).concat(b.historial || []).filter(function (x) {
+      var k = x.f + '|' + x.modo;
+      if (vistos[k]) return false;
+      vistos[k] = 1; return true;
+    }).sort(function (x, y) { return y.f - x.f; }).slice(0, 200);
+    // XP: cada día, lo mayor de los dos; el total = lo anterior a los últimos 120 días (el mayor) + esos días ya juntados
+    var ra = a.racha || {}, rb = b.racha || {}, rr = r.racha = r.racha || {};
+    rr.total = Math.max((ra.total || 0) - sumaXp(ra), (rb.total || 0) - sumaXp(rb), 0) + sumaXp(rr);
+    ['meta', 'hora', 'aviso', 'procesado'].forEach(function (k) { if (k in ra) rr[k] = ra[k]; });   // ajustes de este dispositivo
+    // Repaso espaciado: si una pregunta está en los dos, manda la que pide más repaso
+    r.srs = {};
+    [a.srs || {}, b.srs || {}].forEach(function (s) {
+      Object.keys(s).forEach(function (id) {
+        var e = s[id], y = r.srs[id];
+        if (!y || e.n < y.n || (e.n === y.n && e.p < y.p)) r.srs[id] = e;
+      });
+    });
+    // Fallos: manda el apunte más reciente; el número de fallos, el mayor
+    r.fallos = {};
+    [a.fallos || {}, b.fallos || {}].forEach(function (s) {
+      Object.keys(s).forEach(function (id) {
+        var e = s[id], y = r.fallos[id];
+        if (!y) { r.fallos[id] = { n: e.n, u: e.u, b: e.b }; return; }
+        var nuevo = (e.u || '') > (y.u || '') ? e : y;
+        r.fallos[id] = { n: Math.max(e.n || 0, y.n || 0), u: nuevo.u, b: nuevo.b };
+      });
+    });
+    // Plan de estudio: el que se cambió más tarde
+    r.plan = a.plan && b.plan ? ((a.plan.mod || 0) >= (b.plan.mod || 0) ? a.plan : b.plan) : (a.plan || b.plan);
+    // Lo propio de este dispositivo
+    if (a.nombre !== undefined) r.nombre = a.nombre;
+    r.ia = a.ia;
+    return r;
+  }
   function copiaSeguridad(desde) {
     pantalla = 'copia';
-    var d = diasDesdeCopia(), html = barra(desde ? 'Ajustes' : 'Inicio', 'Copia de seguridad', desde || inicio) + '<div class="contenido">' +
-      '<div class="tarjeta"><p>Tu progreso (lecciones, racha, XP, notas, prácticas y competencias) se guarda solo en este dispositivo. Haz una copia de vez en cuando: si se borra, o si cambias de móvil o de tableta, la restauras y sigues donde lo dejaste.<\/p>' +
-      '<p class="aviso">' + (d === null ? 'Todavía no has hecho ninguna copia.' : 'Última copia: hace ' + (d === 0 ? 'menos de un día' : d + ' día' + (d === 1 ? '' : 's')) + '.') + '<\/p><\/div>' +
+    var d = diasDesdeCopia(), html = barra(desde ? 'Ajustes' : 'Inicio', 'Pasar y guardar el progreso', desde || inicio) + '<div class="contenido">' +
+      '<div class="tarjeta"><p style="margin-top:0">Tu progreso (lecciones, racha, XP, fallos, plan, prácticas y competencias) se guarda en este dispositivo. Para tenerlo igual en el <b>móvil<\/b> y en el <b>iPad<\/b>, pásalo por <b>Google Drive<\/b>:<\/p>' +
+      '<ol class="pasos-copia"><li>En el aparato donde has estudiado, pulsa <b>Guardar en Google Drive<\/b> y elige tu carpeta de Drive (por ejemplo, «DuoChispas»).<\/li>' +
+      '<li>En el otro aparato, pulsa <b>Abrir una copia de Drive<\/b>, elige el archivo más reciente y pulsa <b>Juntar<\/b>.<\/li>' +
+      '<li>Hazlo cada vez que cambies de aparato. Al juntar no se pierde lo que hiciste en ninguno de los dos.<\/li><\/ol>' +
+      '<p class="aviso">' + (d === null ? 'Todavía no has guardado ninguna copia desde este aparato.' : 'Última copia guardada desde este aparato: hace ' + (d === 0 ? 'menos de un día' : d + ' día' + (d === 1 ? '' : 's')) + '.') + ' La clave de la IA no se copia.<\/p><\/div>' +
       '<h4 class="grupo">Guardar<\/h4>' +
-      (ANDROID || EN_CLAUDE ? '' : '<button class="btn" id="cp-archivo" style="text-align:center">💾 Guardar la copia en un archivo<\/button>') +
-      '<button class="btn' + (ANDROID || EN_CLAUDE ? '' : ' sec') + '" id="cp-copiar" style="text-align:center">📋 Copiar la copia como texto<\/button>' +
-      '<p class="aviso">' + (ANDROID || EN_CLAUDE ? 'Pégala en una nota o mándatela por correo o WhatsApp para tenerla a salvo.' : 'En el iPad se abre el menú de compartir: elige «Guardar en Archivos». Con el texto, pégalo en una nota o mándatelo.') + '<\/p>' +
+      (EN_CLAUDE ? '' : '<button class="btn" id="cp-archivo" style="text-align:center">☁️ Guardar en Google Drive<\/button>' +
+        '<p class="aviso">' + (ANDROID ? 'Se abre «Guardar como»: toca el menú ☰ y elige <b>Drive<\/b>.' : 'Se abre el menú de compartir: elige <b>Drive<\/b>, o «Guardar en Archivos» y la carpeta de Google Drive.') + '<\/p>') +
+      '<h4 class="grupo">Abrir<\/h4>' +
+      (EN_CLAUDE ? '' : '<label class="btn" style="text-align:center;display:block">📂 Abrir una copia de Drive<input type="file" id="cp-fichero" accept="' + (ANDROID ? '*/*' : '.json,application/json,text/plain') + '" hidden><\/label>') +
+      '<div id="cp-elegir"><\/div>' +
+      '<details class="tarjeta"><summary>Sin archivo: copiar y pegar el texto<\/summary>' +
+      '<button class="btn sec" id="cp-copiar" style="text-align:center">📋 Copiar la copia como texto<\/button>' +
       '<textarea id="cp-texto" class="cp-texto" readonly hidden><\/textarea>' +
-      '<h4 class="grupo">Restaurar<\/h4>' +
-      (ANDROID ? '' : '<label class="btn sec" style="text-align:center;display:block">📂 Abrir un archivo de copia<input type="file" id="cp-fichero" accept=".json,application/json,text/plain" hidden><\/label>') +
-      '<textarea id="cp-pegar" class="cp-texto" placeholder="…o pega aquí el texto de la copia"><\/textarea>' +
-      '<button class="btn sec" id="cp-restaurar" style="text-align:center">♻️ Restaurar esta copia<\/button>' +
-      '<p class="aviso">Al restaurar se sustituye el progreso actual de este dispositivo por el de la copia.<\/p><\/div>';
+      '<textarea id="cp-pegar" class="cp-texto" placeholder="…o pega aquí el texto de una copia"><\/textarea>' +
+      '<button class="btn sec" id="cp-leer" style="text-align:center">Leer este texto<\/button><\/details><\/div>';
     app.innerHTML = html;
     activarVolver();
     var marcar = function () { datos.ultimaCopia = Date.now(); guardar(); };
+    window.copiaGuardada = function (ok) { if (ok) { marcar(); aviso('☁️ Copia guardada'); copiaSeguridad(desde); } };
     var arch = document.getElementById('cp-archivo');
     if (arch) arch.onclick = function () {
-      var nombre = 'duochispas-copia-' + hoy() + '.json', blob = new Blob([textoCopia()], { type: 'application/json' });
+      var nombre = 'duochispas-' + (ANDROID ? 'movil' : 'ipad') + '-' + hoy() + '.json';
+      if (ANDROID) {
+        if (ANDROID.guardarCopia) { ANDROID.guardarCopia(textoCopia(), nombre); return; }
+        aviso('Actualiza la app para guardar en Drive'); return;
+      }
+      var blob = new Blob([textoCopia()], { type: 'application/json' });
       var fichero = typeof File === 'function' ? new File([blob], nombre, { type: 'application/json' }) : null;
       if (fichero && navigator.canShare && navigator.canShare({ files: [fichero] })) {
-        navigator.share({ files: [fichero], title: 'Copia de DuoChispas' }).then(function () { marcar(); aviso('Copia guardada'); }, function () { /* cancelado */ });
+        navigator.share({ files: [fichero], title: 'Progreso de DuoChispas' }).then(function () { window.copiaGuardada(true); }, function () { /* cancelado */ });
         return;
       }
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = nombre;
       document.body.appendChild(a); a.click(); a.remove();
-      marcar(); aviso('Copia descargada');
+      window.copiaGuardada(true);
     };
     document.getElementById('cp-copiar').onclick = function () {
       var t = textoCopia(), ta = document.getElementById('cp-texto');
@@ -8502,23 +8774,37 @@ window.TALLER = (function () {
       var f = fic.files && fic.files[0];
       if (!f) return;
       var r = new FileReader();
-      r.onload = function () { document.getElementById('cp-pegar').value = String(r.result); restaurarCopia(String(r.result)); };
+      r.onload = function () { elegirRestauracion(String(r.result)); };
       r.readAsText(f);
     };
-    document.getElementById('cp-restaurar').onclick = function () { restaurarCopia(document.getElementById('cp-pegar').value); };
+    document.getElementById('cp-leer').onclick = function () { elegirRestauracion(document.getElementById('cp-pegar').value); };
     window.scrollTo(0, 0);
   }
-  function restaurarCopia(texto) {
+  // Muestra qué trae la copia y deja elegir: juntar (recomendado) o sustituir
+  function elegirRestauracion(texto) {
     var c = null;
     try { c = JSON.parse(String(texto).trim()); } catch (e) { /* no es JSON */ }
     var d = c && c.app === 'DuoChispas' ? c.datos : null;
-    if (!d || typeof d !== 'object' || !Array.isArray(d.historial)) { aviso('Ese texto no es una copia de DuoChispas'); return; }
+    if (!d || typeof d !== 'object' || !Array.isArray(d.historial)) { aviso('Ese archivo no es una copia de DuoChispas'); return; }
     var xp = d.racha && d.racha.total ? d.racha.total : 0, n = d.leidas ? Object.keys(d.leidas).length : 0;
-    confirmar('Copia del ' + String(c.fecha || '').slice(0, 10) + ': ' + n + ' lecciones leídas y ' + xp + ' XP. ¿Sustituir el progreso de este dispositivo?', 'Restaurar', function () {
-      d.ultimaCopia = Date.now();
-      try { localStorage.setItem(CLAVE, JSON.stringify(d)); } catch (e) { aviso('No se pudo guardar: el almacenamiento está bloqueado'); return; }
-      location.reload();
-    });
+    var caja_ = document.getElementById('cp-elegir');
+    caja_.innerHTML = '<div class="tarjeta"><p style="margin-top:0"><b>Copia ' + (c.equipo ? 'del ' + esc(c.equipo) + ' ' : '') + 'del ' + esc(String(c.fecha || '').slice(0, 10).split('-').reverse().join('/')) + '<\/b>: ' +
+      n + ' lecciones leídas, ' + xp + ' XP y ' + d.historial.length + ' tests.<\/p>' +
+      '<button class="btn" id="cp-juntar" style="text-align:center">🔄 Juntar con este aparato (recomendado)<\/button>' +
+      '<button class="btn sec" id="cp-sustituir" style="text-align:center">Sustituir lo de este aparato<\/button>' +
+      '<p class="aviso">Juntar suma lo de los dos: lecciones leídas, tests, fallos, XP de cada día, controles y prácticas. Sustituir borra lo de este aparato y deja solo lo de la copia.<\/p><\/div>';
+    caja_.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var aplicar = function (nuevo, msg) {
+      nuevo.ia = datos.ia;
+      nuevo.ultimaCopia = datos.ultimaCopia;
+      try { localStorage.setItem(CLAVE, JSON.stringify(nuevo)); } catch (e) { aviso('No se pudo guardar: el almacenamiento está bloqueado'); return; }
+      aviso(msg);
+      setTimeout(function () { location.reload(); }, 700);
+    };
+    document.getElementById('cp-juntar').onclick = function () { aplicar(fusionar(JSON.parse(JSON.stringify(datos)), d), '🔄 Progreso juntado'); };
+    document.getElementById('cp-sustituir').onclick = function () {
+      confirmar('Se borrará el progreso de este aparato y quedará solo el de la copia. ¿Seguro?', 'Sustituir', function () { aplicar(d, 'Copia restaurada'); });
+    };
   }
 
   // ---------- Supuestos prácticos ----------
@@ -8573,7 +8859,7 @@ window.TALLER = (function () {
     volver = evaluaciones; document.getElementById('volver').onclick = evaluaciones;
     document.getElementById('borrar').onclick = function () {
       confirmar('¿Borrar historial, estadísticas y preguntas falladas? No se puede deshacer.', 'Borrar', function () {
-        datos = { historial: [], falladas: {}, vistas: {}, temas: {}, casos: {}, leidas: {}, racha: R, srs: {}, dominadas: 0, pn: 0, rapidas: {}, cuentas: {}, competencias: {}, taller: {}, retos: {} };
+        datos = { historial: [], falladas: {}, vistas: {}, temas: {}, casos: {}, leidas: {}, racha: R, srs: {}, dominadas: 0, pn: 0, rapidas: {}, cuentas: {}, competencias: {}, taller: {}, retos: {}, fallos: {}, fallosIni: 1, lecDia: {}, plan: datos.plan, nombre: datos.nombre, ia: datos.ia };
         R.xp = {}; R.protUsados = {}; R.prot = 0; R.record = 0; R.total = 0;
         guardar();
         inicio();
