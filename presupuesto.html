@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Presupuesto</title>
+<style>
+  :root { --fondo: #f4f3ef; --papel: #fff; --texto: #16191e; --suave: #5a616b; --borde: #e1dfd8; --acento: #f2b705; --ok: #1d7a44; --ko: #b3261e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .papel { background: var(--papel); border: 1px solid var(--borde); border-radius: 12px; padding: 20px 18px; }
+  .cab { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 3px solid var(--acento); padding-bottom: 12px; }
+  h1 { font-size: 1.3rem; margin: 0; } h2 { font-size: .9rem; text-transform: uppercase; letter-spacing: .03em; color: var(--suave); margin: 20px 0 6px; }
+  .emp { text-align: right; color: var(--suave); font-size: .9rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+  thead th { border-bottom: 2px solid var(--texto); }
+  .d { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  td small { display: block; color: var(--suave); }
+  .tot td { font-weight: 700; font-size: 1.05rem; border-top: 2px solid var(--texto); border-bottom: 0; }
+  .cond { white-space: pre-wrap; }
+  .caja { margin-top: 18px; padding: 16px; border-radius: 12px; border: 1px solid var(--borde); background: var(--papel); }
+  label { display: block; font-weight: 600; margin: 10px 0 4px; }
+  input, textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid #c8c6bf; border-radius: 10px; background: #fff; color: var(--texto); }
+  .botones { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  button { font: inherit; font-weight: 700; min-height: 48px; padding: 10px 18px; border-radius: 12px; border: 0; cursor: pointer; }
+  .si { background: var(--texto); color: #fff; flex: 1 1 12em; } .no { background: transparent; color: var(--texto); border: 1px solid #c8c6bf; flex: 1 1 8em; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+  .aviso { padding: 12px 14px; border-radius: 10px; background: #fff6d6; margin: 12px 0; }
+  .ok { color: var(--ok); font-weight: 700; } .ko { color: var(--ko); }
+  .pie { color: var(--suave); font-size: .8rem; margin-top: 16px; }
+  @media (max-width: 520px) { .emp { text-align: left; } }
+  @media print { body { background: #fff; } .caja, .pie { display: none; } .papel { border: 0; } }
+</style>
+</head>
+<body>
+<main>
+  <div id="contenido" aria-live="polite"><p>Cargando el presupuesto…</p></div>
+  <p class="pie">Página para ver y responder un presupuesto con su enlace. Este enlace es personal: no lo reenvíes.</p>
+</main>
+<script>
+(function () {
+  'use strict';
+  // Proyecto de Supabase del instalador (la clave publicable no da acceso a nada sin el código del presupuesto)
+  var CONF = { url: 'https://bcdxlpbevgbhqfpqjbiy.supabase.co', key: 'sb_publishable_edd2LIWrWvnBhJOAo1NeNg_D3POh_QA' };
+  var h = new URLSearchParams(location.hash.slice(1)), token = h.get('t') || '';
+  // Solo para pruebas: otro proyecto de Supabase (s = su referencia de 20 letras, k = su clave publicable)
+  if (/^[a-z0-9]{20}$/.test(h.get('s') || '') && /^sb_publishable_[A-Za-z0-9_-]{10,}$/.test(h.get('k') || '')) CONF = { url: 'https://' + h.get('s') + '.supabase.co', key: h.get('k') };
+  var C = document.getElementById('contenido');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function eur(n) { return (Number(n) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+  function fecha(s) { var d = new Date(s); return isNaN(d) ? '' : d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }); }
+  function rpc(fn, cuerpo) {
+    return fetch(CONF.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: CONF.key, 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
+  }
+  function error(t) { C.innerHTML = '<div class="papel"><h1>Presupuesto</h1><p class="aviso">' + esc(t) + '</p></div>'; }
+  if (!/^[A-Za-z0-9_-]{32,64}$/.test(token)) { error('El enlace no está completo. Pídele a tu instalador que te lo vuelva a mandar.'); return; }
+  function pinta(r) {
+    var d = r.datos || {}, e = d.empresa || {}, cli = d.cliente || {}, L = Array.isArray(d.partidas) ? d.partidas : [], cond = Array.isArray(d.condiciones) ? d.condiciones : [];
+    var html = '<article class="papel"><div class="cab"><div><h1>Presupuesto' + (d.num ? ' Nº ' + esc(d.num) : '') + '</h1>' + (d.obra ? '<div>' + esc(d.obra) + '</div>' : '') + '</div>' +
+      '<div class="emp">' + (e.nom ? '<b>' + esc(e.nom) + '</b><br>' : '') + (e.nif ? 'NIF ' + esc(e.nif) + '<br>' : '') + (e.tel ? esc(e.tel) + '<br>' : '') + (e.mail ? esc(e.mail) + '<br>' : '') + (d.fecha ? esc(d.fecha) : '') + '</div></div>' +
+      (cli.nom ? '<h2>Cliente</h2><p>' + esc(cli.nom) + (cli.dir ? '<br>' + esc(cli.dir) : '') + '</p>' : '') +
+      '<h2>Partidas</h2><table><thead><tr><th>Concepto</th><th class="d">Cantidad</th><th class="d">Precio</th><th class="d">Importe</th></tr></thead><tbody>' +
+      L.map(function (p) { return '<tr><td>' + esc(p.t) + '</td><td class="d">' + esc(String(p.n).replace('.', ',')) + ' ' + esc(p.u || '') + '</td><td class="d">' + eur(p.p) + '</td><td class="d">' + eur(p.total) + '</td></tr>'; }).join('') +
+      '</tbody></table><table style="margin-top:8px">' +
+      (d.desc ? '<tr><td>Descuento (' + esc(d.descPct) + ' %)</td><td class="d">−' + eur(d.desc) + '</td></tr>' : '') +
+      '<tr><td>Base imponible</td><td class="d">' + eur(d.base) + '</td></tr><tr><td>IVA (' + esc(d.ivaPct) + ' %)</td><td class="d">' + eur(d.iva) + '</td></tr>' +
+      '<tr class="tot"><td>Total</td><td class="d">' + eur(d.total) + '</td></tr></table>' +
+      (cond.length ? '<h2>Condiciones</h2>' + cond.map(function (c) { return '<p class="cond"><b>' + esc(c[0]) + ':</b> ' + esc(c[1]) + '</p>'; }).join('') : '') + '</article>';
+    if (r.estado === 'enviado') {
+      html += '<section class="caja" aria-labelledby="resp"><h2 id="resp" style="margin-top:0">Tu respuesta</h2>' +
+        '<p>Puedes responder hasta el ' + esc(fecha(r.caduca)) + '. Al aceptar, se avisa a ' + esc(e.nom || 'tu instalador') + '.</p>' +
+        '<label for="nom">Tu nombre y apellidos</label><input id="nom" autocomplete="name" maxlength="100" value="' + esc(cli.nom || '') + '">' +
+        '<label for="nota">Algo que quieras decir (opcional)</label><textarea id="nota" rows="3" maxlength="500"></textarea>' +
+        '<div class="botones"><button class="si" id="si">Acepto el presupuesto</button><button class="no" id="no">No lo acepto</button></div><p id="msg" role="status"></p></section>';
+    } else {
+      html += '<section class="caja"><p class="' + (r.estado === 'aceptado' ? 'ok' : 'ko') + '">' + (r.estado === 'aceptado' ? 'Presupuesto aceptado' : 'Presupuesto no aceptado') + (r.respondido ? ' el ' + esc(fecha(r.respondido)) : '') + '.</p></section>';
+    }
+    C.innerHTML = html;
+    var si = document.getElementById('si');
+    if (si) {
+      var responder = function (acepta) {
+        var nom = document.getElementById('nom').value.trim(), nota = document.getElementById('nota').value.trim(), m = document.getElementById('msg');
+        if (acepta && nom.length < 2) { m.innerHTML = '<span class="ko">Escribe tu nombre para aceptar.</span>'; document.getElementById('nom').focus(); return; }
+        if (acepta && !confirm('¿Aceptas el presupuesto' + (d.num ? ' Nº ' + d.num : '') + ' por ' + eur(d.total) + '?')) return;
+        si.disabled = true; document.getElementById('no').disabled = true; m.textContent = 'Enviando…';
+        rpc('responder_presupuesto', { p_token: token, p_acepta: acepta, p_nombre: nom, p_nota: nota }).then(function (x) {
+          if (!x || !x.ok) { m.innerHTML = '<span class="ko">' + esc((x && x.error) || 'No se ha podido enviar.') + '</span>'; si.disabled = false; document.getElementById('no').disabled = false; return; }
+          r.estado = x.estado; r.respondido = x.respondido; pinta(r);
+        }, function () { m.innerHTML = '<span class="ko">Sin conexión. Inténtalo de nuevo.</span>'; si.disabled = false; document.getElementById('no').disabled = false; });
+      };
+      si.onclick = function () { responder(true); };
+      document.getElementById('no').onclick = function () { responder(false); };
+    }
+  }
+  rpc('ver_presupuesto', { p_token: token }).then(function (r) {
+    if (!r) { error('Este enlace ha caducado o el presupuesto ya no está disponible. Pídele a tu instalador que te lo vuelva a mandar.'); return; }
+    pinta(r);
+  }, function () { error('No se ha podido cargar el presupuesto. Comprueba la conexión y vuelve a intentarlo.'); });
+})();
+</script>
+</body>
+</html>
