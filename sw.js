@@ -1,4 +1,4 @@
-var CACHE = 'duochispas-86560a4281';
+var CACHE = 'duochispas-00fcc6f5ba';
 var ARCHIVOS = ['./', 'index.html', 'manifest.webmanifest', 'icono-180.png', 'icono-192.png', 'icono-512.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(ARCHIVOS); }).then(function () { return self.skipWaiting(); }));
